@@ -20,16 +20,15 @@ video_path = None
 
 def create_zebra_pattern(width, height):
     zebra = np.zeros((height, width, 3), dtype=np.uint8)
-    zebra[(np.indices((height, width)).sum(axis=0) // 10) % 2 == 0] = [255, 255, 0]  # Ярко-желтый
+    zebra[(np.indices((height, width)).sum(axis=0) // 10) % 2 == 0] = [255, 255, 255]  # Белый
     zebra[(np.indices((height, width)).sum(axis=0) // 10) % 2 == 1] = [0, 0, 0]  # Черный
     return zebra
 
+
 def add_zebra_to_frame(frame, zebra_pattern, mode, black_threshold=0, white_threshold=255):
     height, width, _ = frame.shape
-
     mask_bright = (frame.max(axis=2) >= white_threshold)
     mask_dark = (frame.min(axis=2) <= black_threshold)
-
     if mode == 'highlight':
         frame[mask_bright] = zebra_pattern[mask_bright]
     elif mode == 'blackout':
@@ -37,8 +36,8 @@ def add_zebra_to_frame(frame, zebra_pattern, mode, black_threshold=0, white_thre
     elif mode == 'both':
         mask = mask_bright | mask_dark
         frame[mask] = zebra_pattern[mask]
-
     return frame
+
 
 def process_video(input_file_path, mode, black_threshold_value, white_threshold_value):
     global video_path, progress, total_frames
@@ -116,7 +115,13 @@ def get_progress():
 def serve_video():
     global video_path
     if video_path and os.path.exists(video_path):
-        return send_from_directory(app.config['OUTPUT_FOLDER'], os.path.basename(video_path), as_attachment=True)
+        output_path = video_path  # Сохраняем путь к видео
+        with progress_lock:
+            # Сбрасываем прогресс после завершения обработки
+            global progress
+            progress = 0
+            video_path = None
+        return send_from_directory(app.config['OUTPUT_FOLDER'], os.path.basename(output_path))
 
     return '', 404
 
