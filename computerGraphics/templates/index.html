@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Загрузка видео</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+</head>
+<body>
+    <div class="container mt-5">
+        <h1 class="text-center">Загрузка видео</h1>
+
+        <form action="/" method="post" enctype="multipart/form-data" id="uploadForm">
+            <div class="form-group">
+                <label for="file">Выберите видео файл:</label>
+                <input type="file" name="file" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label for="mode">Режим:</label>
+                <select name="mode" class="form-control">
+                    <option value="both">Обе проблемы</option>
+                    <option value="highlight">Пересвет</option>
+                    <option value="blackout">Провал</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="black_threshold">Черный порог:</label>
+                <input type="number" name="black_threshold" class="form-control" value="0" min="0" max="255">
+            </div>
+            <div class="form-group">
+                <label for="white_threshold">Белый порог:</label>
+                <input type="number" name="white_threshold" class="form-control" value="255" min="0" max="255">
+            </div>
+            <button type="submit" class="btn btn-primary">Загрузить видео</button>
+        </form>
+
+        <div id="message" class="mt-3"></div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.3/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            $('#uploadForm').on('submit', function() {
+                $('#message').text('Обработка видео...').addClass('text-info');
+
+                // Используем AJAX для обработки формы
+                $.ajax({
+                    type: 'POST',
+                    url: '/',
+                    data: new FormData(this),
+                    contentType: false,
+                    processData: false,
+                    success: function(response) {
+                        $('#message').text('Видео загружено! Ожидайте обработки...').removeClass('text-info').addClass('text-success');
+                        checkProgress();
+                    },
+                    error: function(error) {
+                        $('#message').text('Ошибка загрузки видео.').removeClass('text-info').addClass('text-danger');
+                    }
+                });
+
+                return false; // предотвращаем обычное поведение формы
+            });
+        });
+
+        function checkProgress() {
+            $.get('/progress', function(data) {
+                if (data.progress < 100) {
+                    setTimeout(checkProgress, 1000); // Проверяем прогресс каждые 1 секунду
+                } else {
+                    $('#message').html('Обработка завершена! Скачайте видео по <a href="/video">ссылке</a>.').removeClass('text-info').addClass('text-success');
+                }
+            });
+        }
+    </script>
+</body>
+</html>
