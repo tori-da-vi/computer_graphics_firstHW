@@ -15,15 +15,14 @@ os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
 progress_lock = Lock()
 progress = 0
+total_frames = 1  # Избегаем деления на ноль
 video_path = None
-
 
 def create_zebra_pattern(width, height):
     zebra = np.zeros((height, width, 3), dtype=np.uint8)
-    zebra[(np.indices((height, width)).sum(axis=0) // 10) % 2 == 0] = [255, 255, 255]  # Белый
+    zebra[(np.indices((height, width)).sum(axis=0) // 10) % 2 == 0] = [255, 255, 0]  # Ярко-желтый
     zebra[(np.indices((height, width)).sum(axis=0) // 10) % 2 == 1] = [0, 0, 0]  # Черный
     return zebra
-
 
 def add_zebra_to_frame(frame, zebra_pattern, mode, black_threshold=0, white_threshold=255):
     height, width, _ = frame.shape
@@ -41,9 +40,8 @@ def add_zebra_to_frame(frame, zebra_pattern, mode, black_threshold=0, white_thre
 
     return frame
 
-
 def process_video(input_file_path, mode, black_threshold_value, white_threshold_value):
-    global video_path
+    global video_path, progress, total_frames
 
     cap = cv2.VideoCapture(input_file_path)
     if not cap.isOpened():
@@ -56,12 +54,11 @@ def process_video(input_file_path, mode, black_threshold_value, white_threshold_
     zebra_pattern = create_zebra_pattern(width, height)
     output_file_path = os.path.join(app.config['OUTPUT_FOLDER'], f"processed_{os.path.basename(input_file_path)}")
 
-    fourcc = cv2.VideoWriter_fourcc(*'XVID')  # Используем XVID кодек
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # Используем mp4v кодек
     out = cv2.VideoWriter(output_file_path, fourcc, fps, (width, height))
 
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
-    global progress
     progress = 0
 
     while True:
@@ -88,7 +85,6 @@ def process_video(input_file_path, mode, black_threshold_value, white_threshold_
     with progress_lock:
         video_path = output_file_path
 
-
 @app.route('/', methods=['GET', 'POST'])
 def index():
     if request.method == 'POST':
@@ -110,26 +106,23 @@ def index():
 
     return render_template('index.html', processing=False)
 
-
 @app.route('/progress')
 def get_progress():
     with progress_lock:
-        return jsonify(progress=progress)
-
+        percent_complete = (progress / total_frames) * 100
+        return jsonify(progress=min(percent_complete, 100))  # Ограничиваем прогресс до 100%
 
 @app.route('/video')
 def serve_video():
     global video_path
     if video_path and os.path.exists(video_path):
-        return send_from_directory(app.config['OUTPUT_FOLDER'], os.path.basename(video_path))
+        return send_from_directory(app.config['OUTPUT_FOLDER'], os.path.basename(video_path), as_attachment=True)
 
     return '', 404
-
 
 @app.errorhandler(Exception)
 def handle_exception(e):
     return f"Произошла ошибка: {str(e)}", 500
-
 
 if __name__ == '__main__':
     app.run(debug=True)
